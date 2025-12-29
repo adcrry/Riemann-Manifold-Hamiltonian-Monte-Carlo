@@ -1,0 +1,20 @@
+[project]
+name = "rmhmc"
+version = "0.1.0"
+description = "Implementation of Riemannian Hamiltonian Monte Carlo"
+dependencies = [
+    "numpy",
+    "scipy",
+#     "matplotlib",
+# ]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
