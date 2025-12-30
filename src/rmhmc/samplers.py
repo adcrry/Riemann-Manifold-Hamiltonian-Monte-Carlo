@@ -67,24 +67,37 @@ class RMHMCSampler(Sampler):
         self, 
         num_samples: int, 
         init_position: np.ndarray, 
-        step_size: float = 0.1,
-        num_leapfrog_steps: int = 10, 
-        num_fixed_point_steps: int = 5,
+        trajectory_length: float = 3.0,
+        initial_step_size: float = 0.5,
+        target_acceptance: float = 0.75,
+        num_burnin_steps: int = 200,
+        adaptation_window: int = 50,
+        num_fixed_point_steps: int = 6,
     ) -> np.ndarray:
         
         positions: list[np.ndarray] = []
         position = init_position.copy()
         
+        step_size = initial_step_size
+        num_leapfrog_steps = max(1, int(np.ceil(trajectory_length / step_size)))
+        
         momentum = self._sample_momentum(position)
         current_hamiltonian = self.hamiltonian(position, momentum)
 
-        accepted_count = 0
+        total_accepted = 0
+        window_accepted = 0
+        
+        total_iterations = num_samples + num_burnin_steps
+        
+        print(f"Starting RM-HMC: Burn-in={num_burnin_steps}, Samples={num_samples}")
+        print(f"Initial: step_size={step_size:.4f}, leapfrog_steps={num_leapfrog_steps}")
 
-        for _ in range(num_samples):
+        for i in range(total_iterations):
             momentum = self._sample_momentum(position)
             current_hamiltonian = self.hamiltonian(position, momentum)
             
             q_prop, p_prop = position.copy(), momentum.copy()
+            
             for _ in range(num_leapfrog_steps):
                 q_prop, p_prop = self._leapfrog_step(
                     q_prop, p_prop, num_fixed_point_steps, step_size
@@ -92,13 +105,31 @@ class RMHMCSampler(Sampler):
             
             proposed_hamiltonian = self.hamiltonian(q_prop, p_prop)
             
-            energy_diff = proposed_hamiltonian - current_hamiltonian
+            if not np.isfinite(proposed_hamiltonian):
+                energy_diff = np.inf
+            else:
+                energy_diff = proposed_hamiltonian - current_hamiltonian
 
             if np.log(np.random.rand()) < -energy_diff:
                 position = q_prop
-                accepted_count += 1
+                if i >= num_burnin_steps:
+                    total_accepted += 1
+                window_accepted += 1
             
-            positions.append(position.copy())
+            if i < num_burnin_steps and (i + 1) % adaptation_window == 0:
+                current_rate = window_accepted / adaptation_window
+                scale_factor = np.exp(current_rate - target_acceptance)
+                step_size = step_size * scale_factor
+                step_size = np.clip(step_size, 1e-4, 5.0)
+                num_leapfrog_steps = max(1, int(np.ceil(trajectory_length / step_size)))
+                print(f"  [Burn-in {i+1}] Rate: {current_rate:.2f} -> New eps: {step_size:.4f}, L: {num_leapfrog_steps}")
+                window_accepted = 0
 
-        print(f"Acceptance rate: {accepted_count / num_samples:.2f}")
+            if i >= num_burnin_steps:
+                positions.append(position.copy())
+
+        final_rate = total_accepted / num_samples
+        print(f"Sampling Finished. Final Acceptance Rate: {final_rate:.2%}")
+        print(f"Final parameters: step_size={step_size:.4f}, leapfrog_steps={num_leapfrog_steps}")
+        
         return np.array(positions)

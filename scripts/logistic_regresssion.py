@@ -185,7 +185,14 @@ if __name__ == "__main__":
         lambda q,p: grad_h_p_logreg(q,p,X,alpha),
         lambda q: metric_tensor_logreg(q,X,alpha)
     )
-    s_rm = rm_sampler.sample(1000, beta_init, step_size=1.1, num_leapfrog_steps=25, num_fixed_point_steps=20)
+
+    s_rm = rm_sampler.sample(1000,
+                               beta_init,
+                               trajectory_length=3.0,
+                               initial_step_size=1.1,
+                               target_acceptance=0.75,
+                               num_burnin_steps=500,
+                               num_fixed_point_steps=15)
 
     print("\nSampling Standard HMC...")
     std_sampler = RMHMCSampler(
@@ -194,7 +201,13 @@ if __name__ == "__main__":
         lambda q,p: grad_h_p_const(q,p),
         metric_const 
     )
-    s_std = std_sampler.sample(1000, beta_init, step_size=0.2, num_leapfrog_steps=25, num_fixed_point_steps=1)
+    s_std = std_sampler.sample(1000,
+                               beta_init,
+                               trajectory_length=3.0,
+                               initial_step_size=0.2,
+                               target_acceptance=0.75,
+                               num_burnin_steps=500,
+                               num_fixed_point_steps=1)
 
     # Burn-in for plotting
-    plot_final_comparison(s_rm[500:], s_std[500:], X, y, alpha)
+    plot_final_comparison(s_rm, s_std, X, y, alpha)
