@@ -93,8 +93,8 @@ class RMHMCSampler(Sampler):
             proposed_hamiltonian = self.hamiltonian(q_prop, p_prop)
             
             energy_diff = proposed_hamiltonian - current_hamiltonian
-            
-            if np.random.rand() < np.exp(-energy_diff):
+
+            if np.log(np.random.rand()) < -energy_diff:
                 position = q_prop
                 accepted_count += 1
             
